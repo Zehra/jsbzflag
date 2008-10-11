@@ -6,7 +6,38 @@ BZ_GET_PLUGIN_VERSION
 
 using namespace v8;
 
-#define new_str String::New
+#define new_str String::NewSymbol
+
+
+Handle<Value> Player_get_id(Local<String> name, const AccessorInfo& info) {
+    return info.Holder()->GetInternalField(0);
+}
+Handle<Value> Player_get_callsign(Local<String> name, const AccessorInfo& info) {
+    int id = info.Holder()->GetInternalField(0)->Int32Value();
+    bz_PlayerRecord *record = bz_getPlayerByIndex(id);
+    if (!record) return Undefined();
+
+    Handle<String> result = String::New(record->callsign.c_str());
+
+    bz_freePlayerRecord(record);
+    return result;
+}
+
+Handle<ObjectTemplate> make_Player_template() {
+    HandleScope handle_scope;
+
+    Handle<ObjectTemplate> result = ObjectTemplate::New();
+    result->SetInternalFieldCount(1);
+  
+    // Add accessors for each of the fields of the request.
+    result->SetAccessor(String::NewSymbol("id"), Player_get_id);
+    result->SetAccessor(String::NewSymbol("callsign"), Player_get_callsign);
+  
+    // Again, return the result through the current handle scope.
+    return handle_scope.Close(result);
+}
+
+
 
 // Reads a file into a v8 string.
 v8::Handle<v8::String> ReadFile(const char* name) {
@@ -116,18 +147,42 @@ class JS_Plugin : public bz_EventHandler
 
   bool call_event(char * event_name, v8::Handle<v8::Value> data);
 
+  Handle<Object> make_player(int player_id);
+  Handle<Object> get_player(int player_id);
+
   v8::HandleScope handle_scope;
   v8::Persistent<v8::Context> context;
+    Persistent<ObjectTemplate> player_template_;
 };
+
+
+Handle<Object> JS_Plugin::make_player(int player_id) {
+    HandleScope handle_scope;
+
+    if (player_template_.IsEmpty()) {
+        player_template_ = Persistent<ObjectTemplate>::New(make_Player_template());
+    }
+
+    Handle<Object> result = player_template_->NewInstance();
+    result->SetInternalField(0, Int32::New(player_id));
+
+    return handle_scope.Close(result);
+}
+
+Handle<Object> JS_Plugin::get_player(int player_id) {
+    return make_player(player_id);
+}
 
 bool JS_Plugin::initialize() {
     v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(js_print));
     global->Set(v8::String::New("getCurrentTime"), v8::FunctionTemplate::New(js_getCurrentTime));
     global->Set(v8::String::New("sendTextMessage"), v8::FunctionTemplate::New(js_sendTextMessage));
+    //global->Set(String::NewSymbol("_dummy_player"), make_player(1));
     context = v8::Context::New(NULL, global);  // TODO Dispose
 
     v8::Context::Scope context_scope(context);
+    context->Global()->Set(String::NewSymbol("_dummy_player"), make_player(0));
     load_file("stdlib.js");
 
     return true;
@@ -183,6 +238,7 @@ void JS_Plugin::process ( bz_EventData *event_data )
         write_bool(data, new_str("handled"), event->handled);
         write_float(data, new_str("rot"), event->rot);
         write_float(data, new_str("time"), event->time);
+        data->Set(new_str("player"), get_player(event->playerID));
 
         if (!call_event("getPlayerSpawnPos", data))
             printf("Calling event failed!\n");
