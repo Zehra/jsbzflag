@@ -33,3 +33,5 @@ events.create("getPlayerSpawnPos");
 
 
 players = [];
+
+Number.prototype.another_value = "another";
