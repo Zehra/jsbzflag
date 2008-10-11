@@ -45,6 +45,11 @@ v8::Handle<v8::Value> js_print(const v8::Arguments& args) {
   return v8::Undefined();
 }
 
+
+Handle<Value> js_getCurrentTime(const Arguments& args) {
+    return Number::New(bz_getCurrentTime());
+}
+
 bool write_pos(Handle<Object> obj, Handle<Value> name, float * pos) {
     Handle<Array> p = Array::New(3);
     for (int i=0;i<3;i++) {
@@ -86,6 +91,15 @@ bool read_float(Handle<Object> obj, Handle<Value> name, float &value) {
     return true;
 }
 
+v8::Handle<v8::Value> js_sendTextMessage(const v8::Arguments& args) {
+    v8::HandleScope handle_scope;
+    int from = args[0]->Int32Value();
+    int to = args[1]->Int32Value();
+    String::Utf8Value str(args[2]);
+    bz_sendTextMessagef(from, to, "%s", *str);
+    return v8::Undefined();
+}
+
 class JS_Plugin : public bz_EventHandler
 {
     public:
@@ -109,6 +123,8 @@ class JS_Plugin : public bz_EventHandler
 bool JS_Plugin::initialize() {
     v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(js_print));
+    global->Set(v8::String::New("getCurrentTime"), v8::FunctionTemplate::New(js_getCurrentTime));
+    global->Set(v8::String::New("sendTextMessage"), v8::FunctionTemplate::New(js_sendTextMessage));
     context = v8::Context::New(NULL, global);  // TODO Dispose
 
     v8::Context::Scope context_scope(context);

@@ -31,3 +31,5 @@ Event.add = function(callback) {
 
 events.create("getPlayerSpawnPos");
 
+
+players = [];
