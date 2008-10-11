@@ -1,8 +1,6 @@
 
-function bz_GetPlayerSpawnPosEvent(e) {
-    print(typeof e.pos);
-    print(e.pos);
+events.getPlayerSpawnPos.add(function (e) {
     e.pos[2] += Math.random()*10;
-    e.handled = True;
-}
+    e.rot = 0;
+});
 
