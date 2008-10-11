@@ -1,80 +1,92 @@
 #include "bzfsAPI.h"
 #include "stdio.h"
-#define XP_UNIX
-#include "mozjs/jsapi.h"
+#include <v8.h>
 
 BZ_GET_PLUGIN_VERSION
 
-static JSRuntime *rt;
-static JSContext *cx;
-static JSObject *global_object;
+using namespace v8;
 
-static char *ReadFile (const char *filename);
-static char *code_buffer;
+#define new_str String::New
 
-JSBool js_print(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
-    const char *string;
-    
-    if (!JS_ConvertArguments(cx, argc, argv, "s", &string))
-        return JS_FALSE;
+// Reads a file into a v8 string.
+v8::Handle<v8::String> ReadFile(const char* name) {
+  FILE* file = fopen(name, "rb");
+  if (file == NULL) return v8::Handle<v8::String>();
 
-    printf("%s\n", string);
+  fseek(file, 0, SEEK_END);
+  int size = ftell(file);
+  rewind(file);
 
-    return JS_TRUE;
+  char* chars = new char[size + 1];
+  chars[size] = '\0';
+  for (int i = 0; i < size;) {
+    int read = fread(&chars[i], 1, size - i, file);
+    i += read;
+  }
+  fclose(file);
+  v8::Handle<v8::String> result = v8::String::New(chars, size);
+  delete[] chars;
+  return result;
 }
 
-static JSFunctionSpec global_functions_spec[] = {
-    "print", js_print, 1, 0, 0,
-    0,0,0,0,0
-};
-
-/* The class of the global object. */
-static JSClass global_class = {
-    "global", JSCLASS_GLOBAL_FLAGS,
-    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
-    JSCLASS_NO_OPTIONAL_MEMBERS
-};
-
-/* The error reporter callback. */
-void reportError(JSContext *cx, const char *message, JSErrorReport *report)
-{
-    fprintf(stderr, "*js error:%s:%u:%s\n",
-            report->filename ? report->filename : "<no filename>",
-            (unsigned int) report->lineno,
-            message);
-}
-
-JSObject * build_position_array(JSContext *cx, float * pos){
-    JSObject * p = JS_NewArrayObject(cx, 0, NULL);
-    JS_AddRoot(cx, p);
-    for (int i=0; i<3; i++) {
-        JSBool ok;
-        jsval v;
-        JS_NewNumberValue(cx, pos[i], &v);
-        ok = JS_SetElement(cx, p, i, &v);
+v8::Handle<v8::Value> js_print(const v8::Arguments& args) {
+  bool first = true;
+  for (int i = 0; i < args.Length(); i++) {
+    v8::HandleScope handle_scope;
+    if (first) {
+      first = false;
+    } else {
+      printf(" ");
     }
-    return p;
+    v8::String::Utf8Value str(args[i]);
+    printf("%s", *str);
+  }
+  printf("\n");
+  return v8::Undefined();
 }
 
-JSBool read_position_array(JSContext *cx, jsval pos_jsval, float * pos){
-    if (!JSVAL_IS_OBJECT(pos_jsval))
-        return JS_FALSE;
-    JSObject * p = JSVAL_TO_OBJECT(pos_jsval);
-    for (int i=0; i<3; i++) {
-        jsval v;
-        if (!JS_GetElement(cx, p, i, &v))
-            return JS_FALSE;
-        jsdouble vd;
-        if (!JS_ConvertArguments(cx, 1, &v, "d", &vd))
-            return JS_FALSE;
-        pos[i] = vd;
+bool write_pos(Handle<Object> obj, Handle<Value> name, float * pos) {
+    Handle<Array> p = Array::New(3);
+    for (int i=0;i<3;i++) {
+        p->Set(Integer::New(i), Number::New(pos[i]));
     }
-    return JS_TRUE;
+    obj->Set(name, p);
+    return true;
+}
+
+bool read_pos(Handle<Object> obj, Handle<Value> name, float * pos) {
+    Handle<Value> pos_value = obj->Get(name);
+    if (!pos_value->IsObject()) return false;
+    Handle<Object> pos_object = pos_value->ToObject();
+    for (int i=0;i<3;i++) {
+        Handle<Value> v = pos_object->Get(Integer::New(i));
+        if (v->IsNumber())
+            pos[i] = v->NumberValue();
+    }
+    obj->Set(name, pos_object);
+    return true;
 }
 
 
-class GenericEventHandler : public bz_EventHandler
+bool write_bool(Handle<Object> obj, Handle<Value> name, bool value) {
+    return obj->Set(name, Boolean::New(value));
+}
+bool read_bool(Handle<Object> obj, Handle<Value> name, bool &value) {
+    Handle<Value> v = obj->Get(name);
+    value = v->BooleanValue();
+    return true;
+}
+
+bool write_float(Handle<Object> obj, Handle<Value> name, float value) {
+    return obj->Set(name, Number::New(value));
+}
+bool read_float(Handle<Object> obj, Handle<Value> name, float &value) {
+    Handle<Value> v = obj->Get(name);
+    value = v->NumberValue(); // FIXME what happens if it can't be converted to a number?
+    return true;
+}
+
+class JS_Plugin : public bz_EventHandler
 {
     public:
         //GenericEventHandler();
@@ -83,75 +95,105 @@ class GenericEventHandler : public bz_EventHandler
         virtual void process(bz_EventData * event_data);
 
         virtual bool autoDelete ( void ) { return false;} // this will be used for more then one event
+
+  bool initialize();
+  bool load_source(v8::Handle<v8::String> source);
+  bool load_file(char * filename);
+
+  bool call_event(char * event_name, v8::Handle<v8::Value> data);
+
+  v8::HandleScope handle_scope;
+  v8::Persistent<v8::Context> context;
 };
 
-GenericEventHandler generic_event_handler;
+bool JS_Plugin::initialize() {
+    v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
+    global->Set(v8::String::New("print"), v8::FunctionTemplate::New(js_print));
+    context = v8::Context::New(NULL, global);  // TODO Dispose
 
-void GenericEventHandler::process ( bz_EventData *event_data )
+    v8::Context::Scope context_scope(context);
+    load_file("stdlib.js");
+
+    return true;
+}
+
+bool JS_Plugin::load_source(v8::Handle<v8::String> source) {
+    v8::HandleScope scope;
+    v8::Context::Scope context_scope(context);
+    v8::Handle<v8::Script> script = v8::Script::Compile(source);
+    v8::Handle<v8::Value> result = script->Run();
+    return true;
+}
+
+bool JS_Plugin::load_file(char * filename) {
+    v8::HandleScope scope;
+    return load_source(ReadFile(filename));
+}
+
+JS_Plugin js_plugin;
+
+bool JS_Plugin::call_event(char * event_name, v8::Handle<v8::Value> data) {
+    v8::Context::Scope context_scope(this->context);
+    v8::HandleScope scope;
+    v8::Handle<v8::Value> event_namespace = context->Global()->Get(new_str("events"));
+    if (!event_namespace->IsObject()) return false;
+    v8::Handle<v8::Value> event_object = event_namespace->ToObject()->Get(new_str(event_name));
+    if (!event_object->IsObject()) return false;
+    v8::Handle<v8::Value> function_object = event_object->ToObject()->Get(new_str("call"));
+    if (!function_object->IsFunction()) return false;
+    v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(function_object);
+
+    const int argc = 1;
+    v8::Handle<v8::Value> argv[argc] = {data};
+    v8::Handle<v8::Value> result = function->Call(event_object->ToObject(), argc, argv);
+    // TODO check for exceptions?
+    return true;
+}
+
+void JS_Plugin::process ( bz_EventData *event_data )
 {
-  switch (event_data->eventType)
-  {
-  default:
-    // really WTF!!!!
-    break;
-
-  case bz_eGetPlayerSpawnPosEvent:
+    v8::Context::Scope context_scope(this->context);
+    bz_GetPlayerSpawnPosEventData *event = (bz_GetPlayerSpawnPosEventData*)event_data;
+    Handle<Object> data = Object::New();
+    switch (event_data->eventType)
     {
-      bz_GetPlayerSpawnPosEventData *spawn = (bz_GetPlayerSpawnPosEventData*)event_data;
+    default:
+      break;
+  
+    case bz_eGetPlayerSpawnPosEvent:
+      {
 
-      JSObject *e = JS_NewObject(cx, NULL, NULL, NULL);
-      jsval v = OBJECT_TO_JSVAL(build_position_array(cx, spawn->pos));
-      JS_SetProperty(cx, e, "pos", &v);
+        write_pos(data, new_str("pos"), event->pos);
+        write_bool(data, new_str("handled"), event->handled);
+        write_float(data, new_str("rot"), event->rot);
+        write_float(data, new_str("time"), event->time);
 
-      void * mark;
-      jsval * args = JS_PushArguments(cx, &mark, "o", e);
-      if (args){
-          jsval r;
-          if (!JS_CallFunctionName(cx, JS_GetGlobalObject(cx), "bz_GetPlayerSpawnPosEvent", 1, args, &r))
-              printf("called successfully\n");
-          JS_PopArguments(cx, mark);
+        if (!call_event("getPlayerSpawnPos", data))
+            printf("Calling event failed!\n");
+
+        read_pos(data, new_str("pos"), event->pos);
+        read_bool(data, new_str("handled"), event->handled);
+        read_float(data, new_str("rot"), event->rot);
       }
-
-
-      jsval pos;
-      if (JS_GetProperty(cx, e, "pos", &pos))
-          read_position_array(cx, pos, spawn->pos);
-
-      //float randPos = rand()/(float)RAND_MAX;
-      //spawn->pos[2] += randPos * spawnRange;
-      spawn->handled = true;
+      break;
     }
-    break;
-  }
 }
 
 class PluginHandler : public bz_APIPluginHandler
 {
 public:
-  virtual bool handle (bzApiString plugin, bzApiString param);
+  virtual bool handle(bzApiString plugin, bzApiString param);
+
 };
+
+
 
 bool
 PluginHandler::handle (bzApiString plugin, bzApiString param)
 {
   const char *filename = plugin.c_str ();
-  char *buffer = ReadFile(filename);
-  if (!buffer) {
-      fprintf(stderr, "Could not open file %s.\n", filename);
-      return false;
-  }
-  code_buffer = buffer;
 
-  JSBool ok;
-  jsval rval;
-
-  ok = JS_EvaluateScript(cx, global_object, code_buffer, strlen(code_buffer), filename, 0, &rval);
-  if (!ok){
-      fprintf(stderr, "evaluating plugin file resulted in errors.\n");
-      return false;
-  }
-
-  return true;
+  return js_plugin.load_file((char *)filename);
 };
 
 static PluginHandler *js_handler;
@@ -161,45 +203,20 @@ BZF_PLUGIN_CALL
 int
 bz_Load (const char *commandLine)
 {
-      // I would use assert here, but "Assertion `3 == 2' failed" is really not a useful error at all
-      if (BZ_API_VERSION != 16) {
-        fprintf (stderr, "plugin currently wraps the version 5 API, but BZFS is exporting version %d. Please complain loudly\n", BZ_API_VERSION);
-        abort ();
-      }
+    if (BZ_API_VERSION != 16) {
+      fprintf (stderr, "plugin currently wraps the version 16 API, but BZFS is exporting version %d. Please complain loudly\n", BZ_API_VERSION);
+      abort ();
+    }
 
-      /* Create a JS runtime. */
-    rt = JS_NewRuntime(8L * 1024L * 1024L);
-    if (rt == NULL)
-        return 1;
+      
+    //js_plugin = new JS_Plugin ();
+    js_plugin.initialize();
+    bz_registerEvent(bz_eGetPlayerSpawnPosEvent,&js_plugin);
 
-    /* Create a context. */
-    cx = JS_NewContext(rt, 8192);
-    if (cx == NULL)
-        return 1;
-    JS_SetOptions(cx, JSOPTION_VAROBJFIX);
-    //JS_SetVersion(cx, JSVERSION_LATEST);
-    JS_SetErrorReporter(cx, reportError);
-
-    /* Create the global object. */
-    global_object = JS_NewObject(cx, &global_class, NULL, NULL);
-    if (global_object == NULL)
-        return 1;
-
-    /* Populate the global object with the standard globals,
-       like Object and Array. */
-    if (!JS_InitStandardClasses(cx, global_object))
-        return 1;
-
-    if (!JS_DefineFunctions(cx, global_object, global_functions_spec))
-        return 1;
-
-        
-  bz_registerEvent(bz_eGetPlayerSpawnPosEvent,&generic_event_handler);
-
-      js_handler = new PluginHandler ();
-      if (!bz_registerCustomPluginHandler ("js", js_handler))
-        fprintf (stderr, "couldn't register custom plugin handler\n");
-      return 0;
+    js_handler = new PluginHandler ();
+    if (!bz_registerCustomPluginHandler ("js", js_handler))
+      fprintf (stderr, "couldn't register custom plugin handler\n");
+    return 0;
 }
 
 BZF_PLUGIN_CALL
@@ -207,33 +224,10 @@ int
 bz_Unload (void)
 {
   //delete [] code_buffer;
-    JS_DestroyContext(cx);
-    JS_DestroyRuntime(rt);
-    JS_ShutDown();
 
-  bz_removeEvent(bz_eGetPlayerSpawnPosEvent,&generic_event_handler);
+  bz_removeEvent(bz_eGetPlayerSpawnPosEvent,&js_plugin);
 
   return 0;
 }
 
-static char *
-ReadFile (const char *filename)
-{
-  FILE *f = fopen (filename, "r");
-  if (!f) {
-      return NULL;
-  }
 
-  unsigned int pos = ftell (f);
-  fseek (f, 0, SEEK_END);
-  unsigned int len = ftell (f);
-  fseek (f, pos, SEEK_SET);
-
-  char *buffer = new char[len + 1];
-  fread (buffer, 1, len, f);
-
-  buffer[len] = '\0';
-
-  fclose (f);
-  return buffer;
-}
