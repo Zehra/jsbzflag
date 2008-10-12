@@ -72,6 +72,7 @@ events.create("getPlayerSpawnPos", ['player']);
 events.create("unknownSlashCommand", ['from']);
 events.create("playerJoin", ['player']);
 events.create("playerPart", ['player']);
+events.create("playerDie", ['player', 'killer']);
 
 events.playerPart.postCall = function() {
     players.remove(this.playerID);
