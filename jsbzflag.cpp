@@ -266,6 +266,7 @@ bool JS_Plugin::initialize() {
     bz_registerEvent(bz_eUnknownSlashCommand,this);
     bz_registerEvent(bz_ePlayerJoinEvent,this);
     bz_registerEvent(bz_ePlayerPartEvent,this);
+    bz_registerEvent(bz_ePlayerDieEvent,this);
 
     return true;
 }
@@ -275,6 +276,7 @@ void JS_Plugin::uninitialize() {
     bz_removeEvent(bz_eUnknownSlashCommand, this);
     bz_removeEvent(bz_ePlayerJoinEvent, this);
     bz_removeEvent(bz_ePlayerPartEvent, this);
+    bz_removeEvent(bz_ePlayerDieEvent, this);
 }
 
 bool JS_Plugin::load_source(v8::Handle<v8::String> source, Handle<Value> file_name) {
@@ -382,6 +384,22 @@ void JS_Plugin::process ( bz_EventData *event_data )
         data->Set(new_str("time"), Number::New(event->time));
         data->Set(new_str("reason"), String::New(event->reason.c_str()));
         if (!call_event("playerPart", data))
+            printf("Calling event failed!\n");
+      }
+      break;
+    case bz_ePlayerDieEvent:
+      {
+
+        bz_PlayerDieEventData *event = (bz_PlayerDieEventData*)event_data;
+        data->Set(new_str("playerID"), Integer::New(event->playerID));
+        data->Set(new_str("killerID"), Integer::New(event->killerID));
+        data->Set(new_str("shotID"), Integer::New(event->shotID));
+        write_pos(data, new_str("pos"), event->pos);
+        data->Set(new_str("time"), Number::New(event->time));
+        data->Set(new_str("rot"), Number::New(event->rot));
+        data->Set(new_str("flagKilledWith"), String::New(event->flagKilledWith.c_str()));
+
+        if (!call_event("playerDie", data))
             printf("Calling event failed!\n");
       }
       break;
