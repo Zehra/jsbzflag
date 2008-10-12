@@ -10,8 +10,22 @@ events.create = function(event_name, player_attributes) {
         player_attributes = [];
     var o = Object.create(Event);
     o.event_name = event_name;
-    //o.call_prototype = Object.create(Event.call_prototype)
-    o.player_attributes = player_attributes;
+    
+    function _add_player_property(name) {
+        o.__defineGetter__(name, function() {
+            return players.get(this[name+"ID"]);
+        });
+        o.__defineSetter__(name, function(value) { // setter function is untested.
+            if (typeof value == "undefined") {
+                this[name+"ID"] = undefined;
+            } else {
+                this[name+"ID"] = value.id;
+            }
+        });
+    }
+    for (var i=0; i<player_attributes.length; i++)
+        _add_player_property(player_attributes[i]);
+
     o._callbacks = [];
     if (typeof event_name != "undefined") {
         this[event_name] = o;
@@ -26,13 +40,13 @@ Event.call = function(data) {
     var obj = Object.create(this);
     for (name in data)
         obj[name] = data[name];
-    obj.preCall();
+    if (obj.preCall) obj.preCall();
     for (var i=0; i<this._callbacks.length; i++) {
         if (!obj._continue_propagation)
             break;
         this._callbacks[i].call(obj);
     }
-    obj.postCall();
+    if (obj.postCall) obj.postCall();
     for (name in data)
         data[name] = obj[name];
 }
@@ -41,28 +55,6 @@ Event.stopPropagation = function() {
     this._continue_propagation = false;
 }
 
-Event.preCall = function() {
-    for (var i=0; i<this.player_attributes.length; i++) {
-        var n = this.player_attributes[i];
-        if (typeof this[n+"ID"] == "number") {
-            this[n] = players.get(this[n+"ID"]);
-        } else {
-            this[n] = null;
-        }
-    }
-}
-
-Event.postCall = function() {
-    for (var i=0; i<this.player_attributes.length; i++) {
-        var n = this.player_attributes[i];
-        if (this[n] && this[n].id) {
-            this[n+"ID"] = this[n].id;
-        } else {
-            this[n+"ID"] = null;
-        }
-    }
-}
- 
 Event.add = function(callback) {
     this._callbacks.push(callback);
 };
@@ -98,6 +90,8 @@ players._hash = {}
 
 // Get (or create) a player object by it's id.
 players.get = function(id) {
+    if (typeof id == "undefined")
+        return undefined;
     if (typeof this._hash[id] == "undefined") {
         var p = new Player(id);
         this._hash[id] = p;
