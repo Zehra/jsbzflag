@@ -12,12 +12,51 @@ using namespace v8;
 Handle<Value> Player_get_id(Local<String> name, const AccessorInfo& info) {
     return info.Holder()->GetInternalField(0);
 }
+
+
 Handle<Value> Player_get_callsign(Local<String> name, const AccessorInfo& info) {
     int id = info.Holder()->GetInternalField(0)->Int32Value();
     bz_PlayerRecord *record = bz_getPlayerByIndex(id);
     if (!record) return Undefined();
 
     Handle<String> result = String::New(record->callsign.c_str());
+
+    bz_freePlayerRecord(record);
+    return result;
+}
+
+Handle<Value> Player_get_currentFlag(Local<String> name, const AccessorInfo& info) {
+    int id = info.Holder()->GetInternalField(0)->Int32Value();
+    bz_PlayerRecord *record = bz_getPlayerByIndex(id);
+    if (!record) return Undefined();
+
+    Handle<Value> result;
+    if (record->currentFlag.c_str() == NULL) {
+        result = Undefined();
+    } else {
+        result = String::New(record->currentFlag.c_str());
+    }
+
+    bz_freePlayerRecord(record);
+    return result;
+}
+
+Handle<Value> Player_get_spawned(Local<String> name, const AccessorInfo& info) {
+    int id = info.Holder()->GetInternalField(0)->Int32Value();
+    bz_PlayerRecord *record = bz_getPlayerByIndex(id);
+    if (!record) return Undefined();
+
+    Handle<Value> result = Boolean::New(record->spawned);
+
+    bz_freePlayerRecord(record);
+    return result;
+}
+Handle<Value> Player_get_verified(Local<String> name, const AccessorInfo& info) {
+    int id = info.Holder()->GetInternalField(0)->Int32Value();
+    bz_PlayerRecord *record = bz_getPlayerByIndex(id);
+    if (!record) return Undefined();
+
+    Handle<Value> result = Boolean::New(record->verified);
 
     bz_freePlayerRecord(record);
     return result;
@@ -41,6 +80,9 @@ Handle<Function> make_Player_function() {
     // Add accessors for each of the fields of the request.
     tmpl->SetAccessor(String::NewSymbol("id"), Player_get_id);
     tmpl->SetAccessor(String::NewSymbol("callsign"), Player_get_callsign);
+    tmpl->SetAccessor(String::NewSymbol("currentFlag"), Player_get_currentFlag);
+    tmpl->SetAccessor(String::NewSymbol("spawned"), Player_get_spawned);
+    tmpl->SetAccessor(String::NewSymbol("verified"), Player_get_verified);
   
     // Again, return the result through the current handle scope.
     return handle_scope.Close(result->GetFunction());
@@ -151,7 +193,7 @@ class JS_Plugin : public bz_EventHandler
         virtual bool autoDelete ( void ) { return false;} // this will be used for more then one event
 
   bool initialize();
-  bool load_source(v8::Handle<v8::String> source);
+  bool load_source(v8::Handle<v8::String> source, Handle<Value> file_name);
   bool load_file(char * filename);
 
   bool call_event(char * event_name, v8::Handle<v8::Value> data);
@@ -188,22 +230,27 @@ bool JS_Plugin::initialize() {
 
     v8::Context::Scope context_scope(context);
     context->Global()->Set(String::NewSymbol("Player"), make_Player_function());
-    load_file("stdlib.js");
+    if (!load_file("stdlib.js"))
+        return false;
 
     return true;
 }
 
-bool JS_Plugin::load_source(v8::Handle<v8::String> source) {
-    v8::HandleScope scope;
+bool JS_Plugin::load_source(v8::Handle<v8::String> source, Handle<Value> file_name) {
     v8::Context::Scope context_scope(context);
-    v8::Handle<v8::Script> script = v8::Script::Compile(source);
+    v8::HandleScope scope;
+    v8::Handle<v8::Script> script = v8::Script::Compile(source, file_name);
+    if (script.IsEmpty())
+        return false;
     v8::Handle<v8::Value> result = script->Run();
+    if (result.IsEmpty())
+        return false;
     return true;
 }
 
 bool JS_Plugin::load_file(char * filename) {
     v8::HandleScope scope;
-    return load_source(ReadFile(filename));
+    return load_source(ReadFile(filename), String::New(filename));
 }
 
 JS_Plugin js_plugin;
@@ -288,7 +335,8 @@ bz_Load (const char *commandLine)
 
       
     //js_plugin = new JS_Plugin ();
-    js_plugin.initialize();
+    if (!js_plugin.initialize())
+        return 1;
     bz_registerEvent(bz_eGetPlayerSpawnPosEvent,&js_plugin);
 
     js_handler = new PluginHandler ();

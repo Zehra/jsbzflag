@@ -1,15 +1,16 @@
-
 Object.create = function(o) {
     function F(){}
     F.prototype = o;
     return new F();
 }
 
-
 events = {};
-events.create = function(event_name) {
+events.create = function(event_name, player_attributes) {
+    if (typeof player_attributes == "undefined")
+        player_attributes = [];
     var o = Object.create(Event);
     o.event_name = event_name;
+    o.player_attributes = player_attributes;
     o._callbacks = [];
     if (typeof event_name != "undefined") {
         this[event_name] = o;
@@ -19,23 +20,41 @@ events.create = function(event_name) {
 
 Event = {}
 Event.call = function(data) {
-    this.prepareData(data);
+    this.preCall(data);
     for (var i=0; i<this._callbacks.length; i++) {
         this._callbacks[i](data, this);
     }
+    this.postCall(data);
 }
-Event.prepareData = function(data) {
-    if (typeof data.playerID == "number") {
-        data.player = players.get(data.playerID);
+
+Event.preCall = function(data) {
+    for (var i=0; i<this.player_attributes.length; i++) {
+        var n = this.player_attributes[i];
+        if (typeof data[n+"ID"] == "number") {
+            data[n] = players.get(data[n+"ID"]);
+        } else {
+            data[n] = null;
+        }
     }
 }
 
+Event.postCall = function(data) {
+    for (var i=0; i<this.player_attributes.length; i++) {
+        var n = this.player_attributes[i];
+        if (data[n] && data[n].id) {
+            data[n+"ID"] = data[n].id;
+        } else {
+            data[n+"ID"] = null;
+        }
+    }
+}
+ 
 Event.add = function(callback) {
     this._callbacks.push(callback);
 }
 
 
-events.create("getPlayerSpawnPos");
+events.create("getPlayerSpawnPos", ['player']);
 
 
 players = [];
@@ -66,5 +85,6 @@ Player.prototype.sendMessage = function(message, from) {
         from = -2;
     sendTextMessage(from, this.id, message);
 }
+
 
 
