@@ -77,7 +77,8 @@ events.unknownSlashCommand.add(function(){
     if (this.handled) return;
     var obj = Object.create(this)
     obj.arguments = this.message.split(/\s+/g);
-    obj.command = obj.arguments.splice(0,1);
+    obj.command = String(obj.arguments.splice(0,1)).replace("/", "");
+    print(obj.command, typeof slash_commands[obj.command])
     if (slash_commands[obj.command]) {
         this.handled = true;
         slash_commands[obj.command].apply(obj, obj.arguments);
