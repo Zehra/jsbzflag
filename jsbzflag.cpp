@@ -214,13 +214,14 @@ class JS_Plugin : public bz_EventHandler
 {
     public:
         //GenericEventHandler();
-        //virtual ~GenericEventHandler();
+        //virtual ~JS_Plugin();
 
         virtual void process(bz_EventData * event_data);
 
         virtual bool autoDelete ( void ) { return false;} // this will be used for more then one event
 
   bool initialize();
+  void uninitialize();
   bool load_source(v8::Handle<v8::String> source, Handle<Value> file_name);
   bool load_file(char * filename);
 
@@ -233,8 +234,8 @@ class JS_Plugin : public bz_EventHandler
 };
 
 
-
 Handle<Value> JS_Plugin::get_player(int player_id) {
+    // I'm not sure if there is any use for this function anymore...
     HandleScope handle_scope;
     v8::Handle<v8::Value> players_array = context->Global()->Get(new_str("players"));
     if (!players_array->IsObject()) return Undefined(); // TODO raise errors instead;
@@ -254,7 +255,6 @@ bool JS_Plugin::initialize() {
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(js_print));
     global->Set(v8::String::New("getCurrentTime"), v8::FunctionTemplate::New(js_getCurrentTime));
     global->Set(v8::String::New("sendTextMessage"), v8::FunctionTemplate::New(js_sendTextMessage));
-    //global->Set(String::NewSymbol("_dummy_player"), make_player(1));
     context = v8::Context::New(NULL, global);  // TODO Dispose
 
     v8::Context::Scope context_scope(context);
@@ -265,8 +265,16 @@ bool JS_Plugin::initialize() {
     bz_registerEvent(bz_eGetPlayerSpawnPosEvent,this);
     bz_registerEvent(bz_eUnknownSlashCommand,this);
     bz_registerEvent(bz_ePlayerJoinEvent,this);
+    bz_registerEvent(bz_ePlayerPartEvent,this);
 
     return true;
+}
+
+void JS_Plugin::uninitialize() {
+    bz_removeEvent(bz_eGetPlayerSpawnPosEvent, this);
+    bz_removeEvent(bz_eUnknownSlashCommand, this);
+    bz_removeEvent(bz_ePlayerJoinEvent, this);
+    bz_removeEvent(bz_ePlayerPartEvent, this);
 }
 
 bool JS_Plugin::load_source(v8::Handle<v8::String> source, Handle<Value> file_name) {
@@ -424,9 +432,7 @@ BZF_PLUGIN_CALL
 int
 bz_Unload (void)
 {
-  //delete [] code_buffer;
-
-  bz_removeEvent(bz_eGetPlayerSpawnPosEvent,&js_plugin);
+    js_plugin.uninitialize();
 
   return 0;
 }
