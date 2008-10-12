@@ -41,25 +41,25 @@ Handle<Value> func_name(Local<String> name, const AccessorInfo& info) {\
     bz_freePlayerRecord(record);\
     return result;\
 }
-#define BOOL_GETTER(func_name, member) GETTER(func_name, (Boolean::New(record->member)))
-#define INT_GETTER(func_name, member) GETTER(func_name, (Integer::New(record->member)))
-#define FLOAT_GETTER(func_name, member) GETTER(func_name, (Number::New(record->member)))
-#define STRING_GETTER(func_name, member) GETTER(func_name, (build_string(record->member)))
+#define BOOL_GETTER(member) GETTER(Player_get_##member, (Boolean::New(record->member)))
+#define INT_GETTER(member) GETTER(Player_get_##member, (Integer::New(record->member)))
+#define FLOAT_GETTER(member) GETTER(Player_get_##member, (Number::New(record->member)))
+#define STRING_GETTER(member) GETTER(Player_get_##member, (build_string(record->member)))
 
-STRING_GETTER(Player_get_callsign, callsign);
-STRING_GETTER(Player_get_ipAddress, ipAddress);
-STRING_GETTER(Player_get_email, email);
-GETTER(Player_get_rot, (Number::New(record->rot)));
+STRING_GETTER(callsign);
+STRING_GETTER(ipAddress);
+STRING_GETTER(email);
+FLOAT_GETTER(rot);
 GETTER(Player_get_pos, (build_pos(record->pos)));
-BOOL_GETTER(Player_get_spawned, spawned);
-BOOL_GETTER(Player_get_verified, verified);
-BOOL_GETTER(Player_get_globalUser, globalUser);
-BOOL_GETTER(Player_get_admin, admin);
-BOOL_GETTER(Player_get_op, op);
-INT_GETTER(Player_get_lag, lag);
-INT_GETTER(Player_get_wins, wins);
-INT_GETTER(Player_get_losses, losses);
-INT_GETTER(Player_get_teamKills, teamKills);
+BOOL_GETTER(spawned);
+BOOL_GETTER(verified);
+BOOL_GETTER(globalUser);
+BOOL_GETTER(admin);
+BOOL_GETTER(op);
+INT_GETTER(lag);
+INT_GETTER(wins);
+INT_GETTER(losses);
+INT_GETTER(teamKills);
 
 // TODO properties: team, flagHistory, groups
 
