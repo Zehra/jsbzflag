@@ -23,18 +23,27 @@ Handle<Value> Player_get_callsign(Local<String> name, const AccessorInfo& info) 
     return result;
 }
 
-Handle<ObjectTemplate> make_Player_template() {
+Handle<Value> Player_new(const Arguments& args) {
+    if (args.IsConstructCall() && args[0]->IsNumber())
+        args.This()->SetInternalField(0, args[0]);
+    return Undefined();
+}
+
+
+Handle<Function> make_Player_function() {
     HandleScope handle_scope;
 
-    Handle<ObjectTemplate> result = ObjectTemplate::New();
-    result->SetInternalFieldCount(1);
+    Handle<FunctionTemplate> result = FunctionTemplate::New(Player_new);
+    Handle<ObjectTemplate> tmpl = result->InstanceTemplate();
+
+    tmpl->SetInternalFieldCount(1);
   
     // Add accessors for each of the fields of the request.
-    result->SetAccessor(String::NewSymbol("id"), Player_get_id);
-    result->SetAccessor(String::NewSymbol("callsign"), Player_get_callsign);
+    tmpl->SetAccessor(String::NewSymbol("id"), Player_get_id);
+    tmpl->SetAccessor(String::NewSymbol("callsign"), Player_get_callsign);
   
     // Again, return the result through the current handle scope.
-    return handle_scope.Close(result);
+    return handle_scope.Close(result->GetFunction());
 }
 
 
@@ -147,30 +156,26 @@ class JS_Plugin : public bz_EventHandler
 
   bool call_event(char * event_name, v8::Handle<v8::Value> data);
 
-  Handle<Object> make_player(int player_id);
-  Handle<Object> get_player(int player_id);
+  Handle<Value> get_player(int player_id);
 
   v8::HandleScope handle_scope;
   v8::Persistent<v8::Context> context;
-    Persistent<ObjectTemplate> player_template_;
 };
 
 
-Handle<Object> JS_Plugin::make_player(int player_id) {
+
+Handle<Value> JS_Plugin::get_player(int player_id) {
     HandleScope handle_scope;
+    v8::Handle<v8::Value> players_array = context->Global()->Get(new_str("players"));
+    if (!players_array->IsObject()) return Undefined(); // TODO raise errors instead;
+    v8::Handle<v8::Value> function_value = players_array->ToObject()->Get(new_str("get"));
+    if (!function_value->IsFunction()) return Undefined();
+    v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(function_value);
 
-    if (player_template_.IsEmpty()) {
-        player_template_ = Persistent<ObjectTemplate>::New(make_Player_template());
-    }
-
-    Handle<Object> result = player_template_->NewInstance();
-    result->SetInternalField(0, Int32::New(player_id));
-
+    const int argc = 1;
+    v8::Handle<v8::Value> argv[argc] = {Number::New(player_id)};
+    v8::Handle<v8::Value> result = function->Call(players_array->ToObject(), argc, argv);
     return handle_scope.Close(result);
-}
-
-Handle<Object> JS_Plugin::get_player(int player_id) {
-    return make_player(player_id);
 }
 
 bool JS_Plugin::initialize() {
@@ -182,7 +187,7 @@ bool JS_Plugin::initialize() {
     context = v8::Context::New(NULL, global);  // TODO Dispose
 
     v8::Context::Scope context_scope(context);
-    context->Global()->Set(String::NewSymbol("_dummy_player"), make_player(0));
+    context->Global()->Set(String::NewSymbol("Player"), make_Player_function());
     load_file("stdlib.js");
 
     return true;
@@ -238,7 +243,8 @@ void JS_Plugin::process ( bz_EventData *event_data )
         write_bool(data, new_str("handled"), event->handled);
         write_float(data, new_str("rot"), event->rot);
         write_float(data, new_str("time"), event->time);
-        data->Set(new_str("player"), get_player(event->playerID));
+        //data->Set(new_str("player"), get_player(event->playerID));
+        data->Set(new_str("playerID"), Integer::New(event->playerID));
 
         if (!call_event("getPlayerSpawnPos", data))
             printf("Calling event failed!\n");
