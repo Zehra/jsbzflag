@@ -89,6 +89,34 @@ Handle<Function> make_Player_function() {
 }
 
 
+void ReportException(v8::TryCatch* try_catch) {
+  v8::HandleScope handle_scope;
+  v8::String::Utf8Value exception(try_catch->Exception());
+  v8::Handle<v8::Message> message = try_catch->Message();
+  if (message.IsEmpty()) {
+    // V8 didn't provide any extra information about this error; just
+    // print the exception.
+    printf("%s\n", *exception);
+  } else {
+    // Print (filename):(line number): (message).
+    v8::String::Utf8Value filename(message->GetScriptResourceName());
+    int linenum = message->GetLineNumber();
+    printf("%s:%i: %s\n", *filename, linenum, *exception);
+    // Print line of source code.
+    v8::String::Utf8Value sourceline(message->GetSourceLine());
+    printf("%s\n", *sourceline);
+    // Print wavy underline (GetUnderline is deprecated).
+    int start = message->GetStartColumn();
+    for (int i = 0; i < start; i++) {
+      printf(" ");
+    }
+    int end = message->GetEndColumn();
+    for (int i = start; i < end; i++) {
+      printf("^");
+    }
+    printf("\n");
+  }
+}
 
 // Reads a file into a v8 string.
 v8::Handle<v8::String> ReadFile(const char* name) {
@@ -239,12 +267,17 @@ bool JS_Plugin::initialize() {
 bool JS_Plugin::load_source(v8::Handle<v8::String> source, Handle<Value> file_name) {
     v8::Context::Scope context_scope(context);
     v8::HandleScope scope;
+    v8::TryCatch try_catch;
     v8::Handle<v8::Script> script = v8::Script::Compile(source, file_name);
-    if (script.IsEmpty())
+    if (script.IsEmpty()) {
+        ReportException(&try_catch);
         return false;
+    }
     v8::Handle<v8::Value> result = script->Run();
-    if (result.IsEmpty())
+    if (result.IsEmpty()) {
+        ReportException(&try_catch);
         return false;
+    }
     return true;
 }
 
@@ -266,17 +299,20 @@ bool JS_Plugin::call_event(char * event_name, v8::Handle<v8::Value> data) {
     if (!function_object->IsFunction()) return false;
     v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(function_object);
 
+    v8::TryCatch try_catch;
     const int argc = 1;
     v8::Handle<v8::Value> argv[argc] = {data};
     v8::Handle<v8::Value> result = function->Call(event_object->ToObject(), argc, argv);
-    // TODO check for exceptions?
+    if (result.IsEmpty()) {
+        ReportException(&try_catch);
+        return false;
+    }
     return true;
 }
 
 void JS_Plugin::process ( bz_EventData *event_data )
 {
     v8::Context::Scope context_scope(this->context);
-    bz_GetPlayerSpawnPosEventData *event = (bz_GetPlayerSpawnPosEventData*)event_data;
     Handle<Object> data = Object::New();
     switch (event_data->eventType)
     {
@@ -286,6 +322,7 @@ void JS_Plugin::process ( bz_EventData *event_data )
     case bz_eGetPlayerSpawnPosEvent:
       {
 
+        bz_GetPlayerSpawnPosEventData *event = (bz_GetPlayerSpawnPosEventData*)event_data;
         write_pos(data, new_str("pos"), event->pos);
         write_bool(data, new_str("handled"), event->handled);
         write_float(data, new_str("rot"), event->rot);
@@ -301,6 +338,21 @@ void JS_Plugin::process ( bz_EventData *event_data )
         read_float(data, new_str("rot"), event->rot);
       }
       break;
+
+    case bz_eUnknownSlashCommand:
+      {
+        bz_UnknownSlashCommandEventData *event = (bz_UnknownSlashCommandEventData*)event_data;
+          data->Set(new_str("message"), String::New(event->message.c_str()));
+          data->Set(new_str("fromID"), Integer::New(event->from));
+          data->Set(new_str("handled"), Boolean::New(event->handled));
+          data->Set(new_str("time"), Number::New(event->time));
+        if (!call_event("unknownSlashCommand", data))
+            printf("Calling event failed!\n");
+        event->handled = data->Get(new_str("handled"))->BooleanValue();
+
+      }
+      break;
+
     }
 }
 
@@ -338,6 +390,7 @@ bz_Load (const char *commandLine)
     if (!js_plugin.initialize())
         return 1;
     bz_registerEvent(bz_eGetPlayerSpawnPosEvent,&js_plugin);
+    bz_registerEvent(bz_eUnknownSlashCommand,&js_plugin);
 
     js_handler = new PluginHandler ();
     if (!bz_registerCustomPluginHandler ("js", js_handler))
