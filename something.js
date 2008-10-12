@@ -4,7 +4,7 @@ events.getPlayerSpawnPos.add(function () {
 });
 
 slash_commands.doit = function(word) {
-    this.from.sendMessage("word");
+    this.from.sendMessage(word);
     this.from.sendMessage(this.message);
 }
 
