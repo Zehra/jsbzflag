@@ -3,6 +3,7 @@ import sys
 
 files = [
 	'jsbzflag.cpp',
+    'player.cpp',
 	]
 
 env = Environment ()
