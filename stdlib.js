@@ -10,6 +10,7 @@ events.create = function(event_name, player_attributes) {
         player_attributes = [];
     var o = Object.create(Event);
     o.event_name = event_name;
+    //o.call_prototype = Object.create(Event.call_prototype)
     o.player_attributes = player_attributes;
     o._callbacks = [];
     if (typeof event_name != "undefined") {
@@ -19,21 +20,27 @@ events.create = function(event_name, player_attributes) {
 }
 
 Event = {}
+//Event.call_prototype = {}
 Event.call = function(data) {
-    this.preCall(data);
+    var obj = Object.create(this);
+    for (name in data)
+        obj[name] = data[name];
+    obj.preCall();
     for (var i=0; i<this._callbacks.length; i++) {
-        this._callbacks[i](data, this);
+        this._callbacks[i].call(obj);
     }
-    this.postCall(data);
+    obj.postCall();
+    for (name in data)
+        data[name] = obj[name];
 }
 
-Event.preCall = function(data) {
+Event.preCall = function() {
     for (var i=0; i<this.player_attributes.length; i++) {
         var n = this.player_attributes[i];
-        if (typeof data[n+"ID"] == "number") {
-            data[n] = players.get(data[n+"ID"]);
+        if (typeof this[n+"ID"] == "number") {
+            this[n] = players.get(this[n+"ID"]);
         } else {
-            data[n] = null;
+            this[n] = null;
         }
     }
 }
@@ -41,10 +48,10 @@ Event.preCall = function(data) {
 Event.postCall = function(data) {
     for (var i=0; i<this.player_attributes.length; i++) {
         var n = this.player_attributes[i];
-        if (data[n] && data[n].id) {
-            data[n+"ID"] = data[n].id;
+        if (this[n] && this[n].id) {
+            this[n+"ID"] = this[n].id;
         } else {
-            data[n+"ID"] = null;
+            this[n+"ID"] = null;
         }
     }
 }

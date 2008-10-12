@@ -1,5 +1,4 @@
-print("something");
-events.getPlayerSpawnPos.add(function (e) {
-    e.player.sendMessage("Air Spawn!", e.player.currentFlag);
-    e.pos[2] += Math.random()*10;
+events.getPlayerSpawnPos.add(function () {
+    this.player.sendMessage("Air Spawn!" + this.player.currentFlag);
+    this.pos[2] += Math.random()*10;
 });
