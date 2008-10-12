@@ -249,6 +249,7 @@ Handle<Value> JS_Plugin::get_player(int player_id) {
 }
 
 bool JS_Plugin::initialize() {
+
     v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
     global->Set(v8::String::New("print"), v8::FunctionTemplate::New(js_print));
     global->Set(v8::String::New("getCurrentTime"), v8::FunctionTemplate::New(js_getCurrentTime));
@@ -260,6 +261,10 @@ bool JS_Plugin::initialize() {
     context->Global()->Set(String::NewSymbol("Player"), make_Player_function());
     if (!load_file("stdlib.js"))
         return false;
+
+    bz_registerEvent(bz_eGetPlayerSpawnPosEvent,this);
+    bz_registerEvent(bz_eUnknownSlashCommand,this);
+    bz_registerEvent(bz_ePlayerJoinEvent,this);
 
     return true;
 }
@@ -353,6 +358,25 @@ void JS_Plugin::process ( bz_EventData *event_data )
       }
       break;
 
+    case bz_ePlayerJoinEvent:
+      {
+        bz_PlayerJoinPartEventData *event = (bz_PlayerJoinPartEventData*)event_data;
+        data->Set(new_str("playerID"), Integer::New(event->playerID));
+        data->Set(new_str("time"), Number::New(event->time));
+        if (!call_event("playerJoin", data))
+            printf("Calling event failed!\n");
+      }
+      break;
+    case bz_ePlayerPartEvent:
+      {
+        bz_PlayerJoinPartEventData *event = (bz_PlayerJoinPartEventData*)event_data;
+        data->Set(new_str("playerID"), Integer::New(event->playerID));
+        data->Set(new_str("time"), Number::New(event->time));
+        data->Set(new_str("reason"), String::New(event->reason.c_str()));
+        if (!call_event("playerPart", data))
+            printf("Calling event failed!\n");
+      }
+      break;
     }
 }
 
@@ -389,8 +413,6 @@ bz_Load (const char *commandLine)
     //js_plugin = new JS_Plugin ();
     if (!js_plugin.initialize())
         return 1;
-    bz_registerEvent(bz_eGetPlayerSpawnPosEvent,&js_plugin);
-    bz_registerEvent(bz_eUnknownSlashCommand,&js_plugin);
 
     js_handler = new PluginHandler ();
     if (!bz_registerCustomPluginHandler ("js", js_handler))

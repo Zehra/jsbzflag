@@ -52,7 +52,7 @@ Event.preCall = function() {
     }
 }
 
-Event.postCall = function(data) {
+Event.postCall = function() {
     for (var i=0; i<this.player_attributes.length; i++) {
         var n = this.player_attributes[i];
         if (this[n] && this[n].id) {
@@ -65,11 +65,17 @@ Event.postCall = function(data) {
  
 Event.add = function(callback) {
     this._callbacks.push(callback);
-}
+};
 
 
 events.create("getPlayerSpawnPos", ['player']);
 events.create("unknownSlashCommand", ['from']);
+events.create("playerJoin", ['player']);
+events.create("playerPart", ['player']);
+
+events.playerPart.postCall = function() {
+    players.remove(this.playerID);
+};
 
 slash_commands = {};
 
@@ -97,7 +103,7 @@ players.get = function(id) {
         this.push(p);
     }
     return this._hash[id];
-}
+};
 players.remove = function(id) {
     this._hash[id] = undefined;
     for (var i=0; i<this.length; i++) {
@@ -106,14 +112,14 @@ players.remove = function(id) {
             break;
         }
     }
-}
+};
 
 
 Player.prototype.sendMessage = function(message, from) {
     if (typeof from == "undefined")
         from = -2;
     sendTextMessage(from, this.id, message);
-}
+};
 
 
 
