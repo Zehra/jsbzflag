@@ -77,7 +77,6 @@ events.unknownSlashCommand.add(function(){
     var obj = Object.create(this)
     obj.arguments = this.message.split(/\s+/g);
     obj.command = String(obj.arguments.splice(0,1)).replace("/", "");
-    print(obj.command, typeof slash_commands[obj.command])
     if (slash_commands[obj.command]) {
         this.handled = true;
         slash_commands[obj.command].apply(obj, obj.arguments);
@@ -113,8 +112,23 @@ players.remove = function(id) {
 Player.prototype.sendMessage = function(message, from) {
     if (typeof from == "undefined")
         from = -2;
-    sendTextMessage(from, this.id, message);
+    _bz.sendTextMessage(from, this.id, message);
 };
 
+Player.prototype.kill = function(spawnOnBase, killer, flagType) {
+    if (typeof killer != "number")
+        killer = killer.id;
+    return _bz.killPlayer(this.id, spawnOnBase, killer, flagType);
+}
 
+Player.prototype.giveFlag = function(flagType, force) {
+    return _bz.givePlayerFlag(this.id, flagType, force);
+}
+
+Player.prototype.removeFlag = function(){
+    return _bz.removePlayerFlag(this.id);
+}
+   
+
+getCurrentTime = _bz.getCurrentTime;
 
