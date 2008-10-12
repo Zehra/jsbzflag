@@ -22,16 +22,23 @@ events.create = function(event_name, player_attributes) {
 Event = {}
 //Event.call_prototype = {}
 Event.call = function(data) {
+    this._continue_propagation = true;
     var obj = Object.create(this);
     for (name in data)
         obj[name] = data[name];
     obj.preCall();
     for (var i=0; i<this._callbacks.length; i++) {
+        if (!obj._continue_propagation)
+            break;
         this._callbacks[i].call(obj);
     }
     obj.postCall();
     for (name in data)
         data[name] = obj[name];
+}
+
+Event.stopPropagation = function() {
+    this._continue_propagation = false;
 }
 
 Event.preCall = function() {
@@ -62,7 +69,21 @@ Event.add = function(callback) {
 
 
 events.create("getPlayerSpawnPos", ['player']);
+events.create("unknownSlashCommand", ['from']);
 
+slash_commands = {};
+
+events.unknownSlashCommand.add(function(){
+    if (this.handled) return;
+    var obj = Object.create(this)
+    obj.arguments = this.message.split(/\s+/g);
+    obj.command = obj.arguments.splice(0,1);
+    if (slash_commands[obj.command]) {
+        this.handled = true;
+        slash_commands[obj.command].apply(obj, obj.arguments);
+    }
+});
+    
 
 players = [];
 players._hash = {}
