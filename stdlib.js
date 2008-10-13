@@ -1,3 +1,6 @@
+// Copyright 2008 by Matthew Marshall <matthew@matthewmarshall.org>
+// License: GPL
+
 Object.create = function(o) {
     function F(){}
     F.prototype = o;
@@ -34,7 +37,6 @@ events.create = function(event_name, player_attributes) {
 }
 
 Event = {}
-//Event.call_prototype = {}
 Event.call = function(data) {
     this._continue_propagation = true;
     var obj = Object.create(this);

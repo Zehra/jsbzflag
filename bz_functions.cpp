@@ -1,5 +1,8 @@
-/* These are functions that pretty much directly wrap the C++ api, accessable 
- * in javascript by the _bz object.  Most of these are wrapped in some way or
+// Copyright 2008 by Matthew Marshall <matthew@matthewmarshall.org>
+// License: GPL
+
+/* These are functions that pretty much directly map to the C++ api, accessable 
+ * in javascript via the _bz object.  Most of these are wrapped in some way or
  * another in stdlib.js, so they generally aren't used directly by plugins.
  */
 
