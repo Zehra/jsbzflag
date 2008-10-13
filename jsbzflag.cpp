@@ -104,25 +104,6 @@ bool read_pos(Handle<Object> obj, Handle<Value> name, float * pos) {
     return true;
 }
 
-
-bool write_bool(Handle<Object> obj, Handle<Value> name, bool value) {
-    return obj->Set(name, Boolean::New(value));
-}
-bool read_bool(Handle<Object> obj, Handle<Value> name, bool &value) {
-    Handle<Value> v = obj->Get(name);
-    value = v->BooleanValue();
-    return true;
-}
-
-bool write_float(Handle<Object> obj, Handle<Value> name, float value) {
-    return obj->Set(name, Number::New(value));
-}
-bool read_float(Handle<Object> obj, Handle<Value> name, float &value) {
-    Handle<Value> v = obj->Get(name);
-    value = v->NumberValue(); // FIXME what happens if it can't be converted to a number?
-    return true;
-}
-
 class JS_Plugin : public bz_EventHandler
 {
     public:
@@ -223,6 +204,10 @@ bool JS_Plugin::call_event(char * event_name, v8::Handle<v8::Value> data) {
 
 void JS_Plugin::process ( bz_EventData *event_data )
 {
+#define WRITE(attribute, valuetype) data->Set(String::NewSymbol(#attribute), valuetype::New(event->attribute))
+#define WRITE_BZSTR(attribute) data->Set(String::NewSymbol(#attribute), String::New(event->attribute.c_str()))
+
+#define READ(attribute, valuetype) event->attribute = data->Get(String::NewSymbol(#attribute))->valuetype##Value()
     v8::Context::Scope context_scope(this->context);
     Handle<Object> data = Object::New();
     switch (event_data->eventType)
@@ -232,43 +217,40 @@ void JS_Plugin::process ( bz_EventData *event_data )
   
     case bz_eGetPlayerSpawnPosEvent:
       {
-
         bz_GetPlayerSpawnPosEventData *event = (bz_GetPlayerSpawnPosEventData*)event_data;
         write_pos(data, new_str("pos"), event->pos);
-        write_bool(data, new_str("handled"), event->handled);
-        write_float(data, new_str("rot"), event->rot);
-        write_float(data, new_str("time"), event->time);
-        //data->Set(new_str("player"), get_player(event->playerID));
-        data->Set(new_str("playerID"), Integer::New(event->playerID));
+        WRITE(handled, Boolean);
+        WRITE(rot, Number);
+        WRITE(time, Number);
+        WRITE(playerID, Int32);
 
         if (!call_event("getPlayerSpawnPos", data))
             printf("Calling event failed!\n");
 
         read_pos(data, new_str("pos"), event->pos);
-        read_bool(data, new_str("handled"), event->handled);
-        read_float(data, new_str("rot"), event->rot);
+        READ(handled, Boolean);
+        READ(rot, Number);
       }
       break;
 
     case bz_eUnknownSlashCommand:
       {
         bz_UnknownSlashCommandEventData *event = (bz_UnknownSlashCommandEventData*)event_data;
-          data->Set(new_str("message"), String::New(event->message.c_str()));
-          data->Set(new_str("fromID"), Integer::New(event->from));
-          data->Set(new_str("handled"), Boolean::New(event->handled));
-          data->Set(new_str("time"), Number::New(event->time));
+        WRITE_BZSTR(message);
+        data->Set(String::NewSymbol("fromID"), Int32::New(event->from));
+        WRITE(handled, Boolean);
+        WRITE(time, Number);
         if (!call_event("unknownSlashCommand", data))
             printf("Calling event failed!\n");
-        event->handled = data->Get(new_str("handled"))->BooleanValue();
-
+        READ(handled, Boolean);
       }
       break;
 
     case bz_ePlayerJoinEvent:
       {
         bz_PlayerJoinPartEventData *event = (bz_PlayerJoinPartEventData*)event_data;
-        data->Set(new_str("playerID"), Integer::New(event->playerID));
-        data->Set(new_str("time"), Number::New(event->time));
+        WRITE(playerID, Int32);
+        WRITE(time, Number);
         if (!call_event("playerJoin", data))
             printf("Calling event failed!\n");
       }
@@ -276,9 +258,9 @@ void JS_Plugin::process ( bz_EventData *event_data )
     case bz_ePlayerPartEvent:
       {
         bz_PlayerJoinPartEventData *event = (bz_PlayerJoinPartEventData*)event_data;
-        data->Set(new_str("playerID"), Integer::New(event->playerID));
-        data->Set(new_str("time"), Number::New(event->time));
-        data->Set(new_str("reason"), String::New(event->reason.c_str()));
+        WRITE(playerID, Int32);
+        WRITE(time, Number);
+        WRITE_BZSTR(reason);
         if (!call_event("playerPart", data))
             printf("Calling event failed!\n");
       }
@@ -287,19 +269,22 @@ void JS_Plugin::process ( bz_EventData *event_data )
       {
 
         bz_PlayerDieEventData *event = (bz_PlayerDieEventData*)event_data;
-        data->Set(new_str("playerID"), Integer::New(event->playerID));
-        data->Set(new_str("killerID"), Integer::New(event->killerID));
-        data->Set(new_str("shotID"), Integer::New(event->shotID));
+        WRITE(playerID, Int32);
+        WRITE(killerID, Int32);
+        WRITE(shotID, Int32);
         write_pos(data, new_str("pos"), event->pos);
-        data->Set(new_str("time"), Number::New(event->time));
-        data->Set(new_str("rot"), Number::New(event->rot));
-        data->Set(new_str("flagKilledWith"), String::New(event->flagKilledWith.c_str()));
+        WRITE(rot, Number);
+        WRITE(time, Number);
+        WRITE_BZSTR(flagKilledWith);
 
         if (!call_event("playerDie", data))
             printf("Calling event failed!\n");
       }
       break;
     }
+#undef WRITE
+#undef WRITE_BZSTR
+#undef READ
 }
 
 class PluginHandler : public bz_APIPluginHandler
