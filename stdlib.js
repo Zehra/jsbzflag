@@ -67,6 +67,9 @@ events.create("unknownSlashCommand", ['from']);
 events.create("playerJoin", ['player']);
 events.create("playerPart", ['player']);
 events.create("playerDie", ['player', 'killer']);
+events.create("tick");
+events.create("flagGrabbed", ['player']);
+events.create("flagDropped", ['player']);
 
 events.playerPart.postCall = function() {
     players.remove(this.playerID);
