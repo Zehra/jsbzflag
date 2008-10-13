@@ -1,3 +1,6 @@
+// Copyright 2008 by Matthew Marshall <matthew@matthewmarshall.org>
+// License: GPL
+
 #include "bzfsAPI.h"
 #include "stdio.h"
 #include <v8.h>
