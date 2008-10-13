@@ -139,11 +139,15 @@ bool JS_Plugin::initialize() {
     if (!load_file(path_to_stdlib))
         return false;
 
+    // Maybe we should just register for *all* events and be done with it??
     bz_registerEvent(bz_eGetPlayerSpawnPosEvent,this);
     bz_registerEvent(bz_eUnknownSlashCommand,this);
     bz_registerEvent(bz_ePlayerJoinEvent,this);
     bz_registerEvent(bz_ePlayerPartEvent,this);
     bz_registerEvent(bz_ePlayerDieEvent,this);
+    bz_registerEvent(bz_eTickEvent,this);
+    bz_registerEvent(bz_eFlagGrabbedEvent,this);
+    bz_registerEvent(bz_eFlagDroppedEvent,this);
 
     return true;
 }
@@ -154,6 +158,9 @@ void JS_Plugin::uninitialize() {
     bz_removeEvent(bz_ePlayerJoinEvent, this);
     bz_removeEvent(bz_ePlayerPartEvent, this);
     bz_removeEvent(bz_ePlayerDieEvent, this);
+    bz_removeEvent(bz_eTickEvent, this);
+    bz_removeEvent(bz_eFlagGrabbedEvent, this);
+    bz_removeEvent(bz_eFlagDroppedEvent, this);
 }
 
 bool JS_Plugin::load_source(v8::Handle<v8::String> source, Handle<Value> file_name) {
@@ -267,7 +274,6 @@ void JS_Plugin::process ( bz_EventData *event_data )
       break;
     case bz_ePlayerDieEvent:
       {
-
         bz_PlayerDieEventData *event = (bz_PlayerDieEventData*)event_data;
         WRITE(playerID, Int32);
         WRITE(killerID, Int32);
@@ -278,6 +284,30 @@ void JS_Plugin::process ( bz_EventData *event_data )
         WRITE_BZSTR(flagKilledWith);
 
         if (!call_event("playerDie", data))
+            printf("Calling event failed!\n");
+      }
+      break;
+    case bz_eFlagGrabbedEvent:
+      {
+        bz_FlagGrabbedEventData *event = (bz_FlagGrabbedEventData*)event_data;
+        WRITE(playerID, Int32);
+        WRITE(flagID, Int32);
+        WRITE(flagType, String);
+        write_pos(data, new_str("pos"), event->pos);
+
+        if (!call_event("flagGrabbed", data))
+            printf("Calling event failed!\n");
+      }
+      break;
+    case bz_eFlagDroppedEvent:
+      {
+        bz_FlagDroppedEventData *event = (bz_FlagDroppedEventData*)event_data;
+        WRITE(playerID, Int32);
+        WRITE(flagID, Int32);
+        WRITE(flagType, String);
+        write_pos(data, new_str("pos"), event->pos);
+
+        if (!call_event("flagDropped", data))
             printf("Calling event failed!\n");
       }
       break;

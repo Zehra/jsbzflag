@@ -13,11 +13,17 @@ events.getPlayerSpawnPos: pos, rot, player, time, handled
 events.unknownSlashCommand: message, from, time, handled
     (handled is modifiable)
 
-events.playerJoinEvent: player, time
+events.playerJoin: player, time
 
-events.playerPartEvent: player, time, reason
+events.playerPart: player, time, reason
 
-events.playerDieEvent: player, killer, shotID, pos, rot, time, flagKilledWith
+events.playerDie: player, killer, shotID, pos, rot, time, flagKilledWith
+
+events.tick: time
+
+events.flagGrabbed: player, flagID, flagType, pos
+
+events.flagDropped: player, flagID, flagType, pos
 
 
 Slash Commands
