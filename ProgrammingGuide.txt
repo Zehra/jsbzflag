@@ -1,0 +1,64 @@
+Events
+======
+
+You can register an event callback by calling "events.<eventname>.add(<callback>);"
+
+The callback will be called bound to the event object.  (This means that you use "this.player" to access the "player" attribute of the event.)
+
+These are the currently implemented events and their attributes:
+
+events.getPlayerSpawnPos: pos, rot, player, time, handled
+    (pos, rot, and handled are modifiable)
+
+events.unknownSlashCommand: message, from, time, handled
+    (handled is modifiable)
+
+events.playerJoinEvent: player, time
+
+events.playerPartEvent: player, time, reason
+
+events.playerDieEvent: player, killer, shotID, pos, rot, time, flagKilledWith
+
+
+Slash Commands
+==============
+
+To register a slash command, assign a function to an attribute of the slash_commands global attribute.  The function will be called with the unknownSlashCommand data object as 'this'.  The command message will be split by spaces and passed as arguments.  (Take a look at the samples if this doesn't make sense.)
+
+
+Player Objects
+==============
+
+Instead of passing around integer id's, we use Player objects.  Player objects have the following properties and methods:
+
+  * sendMessage(message, [from])
+  * kill([killer, spawnOnBase=false, flagType])
+  * giveFlag(flagType, [force=false])
+  * removeFlag()
+  * id
+  * callsign
+  * ipAddress
+  * email
+  * currentFlag
+  * spawned
+  * verified
+  * globalUser
+  * admin
+  * op
+  * lag
+  * wins
+  * losses
+  * teamKills
+  * rot
+  * pos
+
+All of the player objects are stored in the global 'players' array.
+
+Player objects are persistent.  (So you store an arbitrary value in a player object from one event, and read the same value in another event.) 
+
+
+Global Functions
+================
+
+ * getCurrentTime()
+ * print(string, ...)

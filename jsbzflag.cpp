@@ -10,7 +10,7 @@ using namespace v8;
 
 #define new_str String::NewSymbol
 
-
+const char * path_to_stdlib = NULL;
 
 
 void ReportException(v8::TryCatch* try_catch) {
@@ -133,7 +133,7 @@ class JS_Plugin : public bz_EventHandler
   bool initialize();
   void uninitialize();
   bool load_source(v8::Handle<v8::String> source, Handle<Value> file_name);
-  bool load_file(char * filename);
+  bool load_file(const char * filename);
 
   bool call_event(char * event_name, v8::Handle<v8::Value> data);
 
@@ -152,7 +152,7 @@ bool JS_Plugin::initialize() {
     v8::Context::Scope context_scope(context);
     context->Global()->Set(String::NewSymbol("Player"), make_Player_function());
     context->Global()->Set(String::NewSymbol("_bz"), make_bz_object());
-    if (!load_file("stdlib.js"))
+    if (!load_file(path_to_stdlib))
         return false;
 
     bz_registerEvent(bz_eGetPlayerSpawnPosEvent,this);
@@ -189,7 +189,7 @@ bool JS_Plugin::load_source(v8::Handle<v8::String> source, Handle<Value> file_na
     return true;
 }
 
-bool JS_Plugin::load_file(char * filename) {
+bool JS_Plugin::load_file(const char * filename) {
     v8::HandleScope scope;
     return load_source(ReadFile(filename), String::New(filename));
 }
@@ -307,13 +307,12 @@ public:
 };
 
 
-
 bool
 PluginHandler::handle (bzApiString plugin, bzApiString param)
 {
   const char *filename = plugin.c_str ();
 
-  return js_plugin.load_file((char *)filename);
+  return js_plugin.load_file(filename);
 };
 
 static PluginHandler *js_handler;
@@ -324,14 +323,21 @@ int
 bz_Load (const char *commandLine)
 {
     if (BZ_API_VERSION != 16) {
-      fprintf (stderr, "plugin currently wraps the version 16 API, but BZFS is exporting version %d. Please complain loudly\n", BZ_API_VERSION);
-      abort ();
+      fprintf (stderr, "The jsbzflag plugin currently wraps the version 16 API, but BZFS is exporting version %d. Things may go wrong.\n", BZ_API_VERSION);
     }
 
+    if (strlen(commandLine) < 1) {
+        fprintf(stderr, "Cannot load jsbzflag plugin because the path to stdlib.js isn't given.\n");
+        fprintf(stderr, "Load the plugin like this: -loadplugin /path/to/jsbzflag.so,/path/to/stdlib.js\n");
+        abort();
+    }
+    path_to_stdlib = commandLine;
       
     //js_plugin = new JS_Plugin ();
-    if (!js_plugin.initialize())
-        return 1;
+    if (!js_plugin.initialize()) {
+        fprintf(stderr, "There was a problem initializing the jsbzflag plugin.  Aborting.\n");
+        abort();
+    }
 
     js_handler = new PluginHandler ();
     if (!bz_registerCustomPluginHandler ("js", js_handler))

@@ -1,0 +1,39 @@
+These are some tips on compiling and running.  This assumes that you are already familiar with compilers and using bzflag plugins.
+
+
+Compiling v8
+------------
+
+jsbzflag uses Google's v8 javascript engine.
+
+Get the stable branch of v8:
+svn checkout http://v8.googlecode.com/svn/trunk/ v8
+
+Compile it by running "scons". (not ./configure or make.)  The default scons configuration worked fine for me.
+
+
+Compiling jsbzflag
+------------------
+
+To compile jsbzflag, the compiler will need to find v8.h and bzfsAPI.h, and the linker will need to find libv8.a.  So either make sure those are on your standard include and library paths or edit the paths in the SConstruct file.
+
+Running 'scons' should give you a nice jsbzflag.so.
+
+
+Using jsbzflag
+--------------
+
+Load the plugin like this:
+
+    -loadplugin /path/to/jsbzflag.so,/path/to/stdlib.js
+
+(stdlib.js contains javascript implementations of stuff that jsbzflag.so needs to do much of anything, and it can't find it on it's own.)
+
+After loading jsbzflag.so, you can use -loadplugin to load .js files.  
+
+Just to be clear, here is a complete, working example.  (Run it in the jsbzflag directory.)
+
+    bzfs -loadplugin ./jsbzflag.so,./stdlib.js  -loadplugin ./samples/airspawn.js
+
+Note that currently all javascript plugins share the same context.  This will probably be changed in the future.
+
