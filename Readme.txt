@@ -5,6 +5,8 @@ License: GPL
 This is a plugin for the BZFlag server that allows you to use Javascript
 to write other plugins for the BZFlag server.
 
+So far, only a small portion of the bzflag api is exposed.  What is available
+is listed in ProgrammingGuide.txt.
 
 The latest version is available by installing Mercurial and running this:
 
