@@ -63,6 +63,7 @@ INT_GETTER(lag);
 INT_GETTER(wins);
 INT_GETTER(losses);
 INT_GETTER(teamKills);
+INT_GETTER(team);
 
 // TODO properties: team, flagHistory, groups
 
@@ -104,6 +105,7 @@ Handle<Function> make_Player_function() {
     tmpl->SetAccessor(String::NewSymbol("teamKills"), Player_get_teamKills);
     tmpl->SetAccessor(String::NewSymbol("rot"), Player_get_rot);
     tmpl->SetAccessor(String::NewSymbol("pos"), Player_get_pos);
+    tmpl->SetAccessor(String::NewSymbol("teamID"), Player_get_team);
   
     // Again, return the result through the current handle scope.
     return handle_scope.Close(result->GetFunction());

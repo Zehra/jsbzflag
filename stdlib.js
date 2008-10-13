@@ -133,7 +133,36 @@ Player.prototype.giveFlag = function(flagType, force) {
 Player.prototype.removeFlag = function(){
     return _bz.removePlayerFlag(this.id);
 }
-   
+
+Player.prototype.__defineGetter__('team', function(){
+    if (this.teamID == -1)
+        return undefined;
+    return teams[this.teamID];
+});
+
+
+function Team(id, name) {
+    this.id = id;
+    this.name = name;
+}
+
+Team.prototype.__defineGetter__('players',function(){
+    return players.filter(function(player){return player.team == this}, this);
+});
+
+Team.prototype.sendMessage = function(message, from) {
+    if (typeof from == "undefined")
+        from = -2;
+    _bz.sendTextMessageTeam(from, this.id, message);
+};
+
+teams = new (function(team_names){
+    for (var i in team_names) {
+        var name = team_names[i];
+        this[name] = new Team(i, name);
+        this[i] = this[name];
+    }
+})(['rogue', 'red', 'green', 'blue', 'purple', 'rabbit', 'hunter', 'observers', 'administrators']);
 
 getCurrentTime = _bz.getCurrentTime;
 

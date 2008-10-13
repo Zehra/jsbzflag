@@ -24,6 +24,15 @@ Handle<Value> js_sendTextMessage(const v8::Arguments& args) {
     return v8::Undefined();
 }
 
+Handle<Value> js_sendTextMessageTeam(const v8::Arguments& args) {
+    HandleScope handle_scope;
+    int from = args[0]->Int32Value();
+    bz_eTeamType to = (bz_eTeamType)args[1]->Int32Value();
+    String::Utf8Value str(args[2]);
+    bz_sendTextMessagef(from, to, "%s", *str);
+    return v8::Undefined();
+}
+
 Handle<Value> js_givePlayerFlag(const v8::Arguments& args) {
     HandleScope handle_scope;
     int playerId = args[0]->Int32Value();
@@ -62,6 +71,7 @@ Handle<Object> make_bz_object() {
     #define FUNCTION(name) bz->Set(String::NewSymbol(#name), FunctionTemplate::New(js_##name)->GetFunction())
     FUNCTION(getCurrentTime);
     FUNCTION(sendTextMessage);
+    FUNCTION(sendTextMessageTeam);
     FUNCTION(givePlayerFlag);
     FUNCTION(removePlayerFlag);
     FUNCTION(killPlayer);

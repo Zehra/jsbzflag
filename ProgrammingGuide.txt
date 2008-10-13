@@ -43,6 +43,7 @@ Instead of passing around integer id's, we use Player objects.  Player objects h
   * removeFlag()
   * id
   * callsign
+  * team     // Team object
   * ipAddress
   * email
   * currentFlag
@@ -63,8 +64,23 @@ All of the player objects are stored in the global 'players' array.
 Player objects are persistent.  (So you store an arbitrary value in a player object from one event, and read the same value in another event.) 
 
 
+Team Objects
+============
+
+Team objects are accessable by name from the global 'teams' object.  They have the following properties and methods:
+
+  * sendMessage(message, [from])
+  * players   // An array of all players in the team.
+  * name
+  * id
+
+For example, you can send a message to all green takes like this:
+
+  teams.green.sendMessage("Hi greens!");
+
 Global Functions
 ================
 
  * getCurrentTime()
  * print(string, ...)
+
