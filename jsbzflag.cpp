@@ -6,6 +6,7 @@
 #include <v8.h>
 #include "player.h"
 #include "bz_functions.h"
+#include <vector>
 
 BZ_GET_PLUGIN_VERSION
 
@@ -185,7 +186,7 @@ bool JS_Plugin::load_file(const char * filename) {
     return load_source(ReadFile(filename), String::New(filename));
 }
 
-JS_Plugin js_plugin;
+//JS_Plugin js_plugin;
 
 bool JS_Plugin::call_event(char * event_name, v8::Handle<v8::Value> data) {
     v8::Context::Scope context_scope(this->context);
@@ -321,6 +322,9 @@ class PluginHandler : public bz_APIPluginHandler
 {
 public:
   virtual bool handle(bzApiString plugin, bzApiString param);
+  virtual ~PluginHandler();
+
+  std::vector<JS_Plugin*> js_plugins;
 
 };
 
@@ -329,9 +333,30 @@ bool
 PluginHandler::handle (bzApiString plugin, bzApiString param)
 {
   const char *filename = plugin.c_str ();
+  JS_Plugin * js_plugin = new JS_Plugin();
+    if (!js_plugin->initialize()) {
+        fprintf(stderr, "There was a problem initializing the jsbzflag plugin.  Aborting.\n");
+        delete js_plugin;
+        return false;
+    }
 
-  return js_plugin.load_file(filename);
+  if (!js_plugin->load_file(filename)) {
+      fprintf(stderr, "There was a problem loading %s", filename);
+      js_plugin->uninitialize();
+      delete js_plugin;
+      return false;
+  }
+  js_plugins.push_back(js_plugin);
 };
+
+PluginHandler::~PluginHandler(){
+    while (!js_plugins.empty()) {
+        JS_Plugin * p = js_plugins.back();
+        js_plugins.pop_back();
+        p->uninitialize();
+        delete p;
+    }
+}
 
 static PluginHandler *js_handler;
 
@@ -352,10 +377,6 @@ bz_Load (const char *commandLine)
     path_to_stdlib = commandLine;
       
     //js_plugin = new JS_Plugin ();
-    if (!js_plugin.initialize()) {
-        fprintf(stderr, "There was a problem initializing the jsbzflag plugin.  Aborting.\n");
-        abort();
-    }
 
     js_handler = new PluginHandler ();
     if (!bz_registerCustomPluginHandler ("js", js_handler))
@@ -367,8 +388,9 @@ BZF_PLUGIN_CALL
 int
 bz_Unload (void)
 {
-    js_plugin.uninitialize();
 
+    bz_removeCustomPluginHandler("js", js_handler);
+    delete js_handler;
   return 0;
 }
 
