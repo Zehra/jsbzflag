@@ -35,5 +35,3 @@ Just to be clear, here is a complete, working example.  (Run it in the jsbzflag 
 
     bzfs -loadplugin ./jsbzflag.so,./stdlib.js  -loadplugin ./samples/airspawn.js
 
-Note that currently all javascript plugins share the same context.  This will probably be changed in the future.
-
