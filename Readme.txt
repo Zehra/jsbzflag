@@ -12,6 +12,8 @@ The latest version is available by installing Mercurial and running this:
 
     hg clone http://freehg.org/u/mmarshall/jsbzflag/
 
+See Install.txt for instructions on building.
+
 You can update your cloned copy by running this inside of the jsbzflag directory:
 
     hg pull -u
