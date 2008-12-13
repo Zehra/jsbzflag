@@ -7,6 +7,8 @@
 #include "player.h"
 #include "bz_functions.h"
 #include <vector>
+#include <string.h>
+#include <stdlib.h>
 
 BZ_GET_PLUGIN_VERSION
 
@@ -120,7 +122,7 @@ class JS_Plugin : public bz_EventHandler
   bool load_source(v8::Handle<v8::String> source, Handle<Value> file_name);
   bool load_file(const char * filename);
 
-  bool call_event(char * event_name, v8::Handle<v8::Value> data);
+  bool call_event(const char * event_name, v8::Handle<v8::Value> data);
 
   Handle<Value> get_player(int player_id);
 
@@ -188,7 +190,7 @@ bool JS_Plugin::load_file(const char * filename) {
 
 //JS_Plugin js_plugin;
 
-bool JS_Plugin::call_event(char * event_name, v8::Handle<v8::Value> data) {
+bool JS_Plugin::call_event(const char * event_name, v8::Handle<v8::Value> data) {
     v8::Context::Scope context_scope(this->context);
     v8::HandleScope scope;
     v8::Handle<v8::Value> event_namespace = context->Global()->Get(new_str("events"));
